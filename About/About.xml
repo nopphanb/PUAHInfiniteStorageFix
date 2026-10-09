@@ -3,7 +3,7 @@
   <name>Pick Up And Haul × Infinite Storage Fix</name>
   <author>nopphan</author>
   <packageId>nopphan.puahinfinitestoragefix</packageId>
-  <modVersion>1.1.0</modVersion>
+  <modVersion>1.2.0</modVersion>
   <supportedVersions>
     <li>1.6</li>
   </supportedVersions>
@@ -13,7 +13,9 @@ It also fixes an Infinite Storage bug on its own: vanilla's storage search ignor
 
 Pick Up And Haul plans multi-item trips by counting free stack space in the target cell, but Infinite Storage stores items virtually, so that plan comes out broken and the job fails and restarts forever. With this mod, Pick Up And Haul keeps its multi-item hauling for every normal stockpile and shelf, while items whose best storage is an Infinite Storage are hauled by vanilla's one-stack job, which Infinite Storage is built for. Infinite Storage is also never added as an extra stop on a multi-item trip.
 
-Needs KV Infinite Storage. The Pick Up And Haul part turns on only when Pick Up And Haul is also loaded. Load after both.</description>
+It also silences a Pick Up And Haul bug: its reservation step ignores vanilla's "may fail quietly" flag, so whenever another hauler (often a mech lifter) grabs an item a queued trip planned to pick up, it logs a red "Could not reserve ... HaulToInventory" error. The trip now fails quietly and the colonist picks other work, as vanilla intends.
+
+Each fix turns on only for the mods that are loaded: the storage fix needs KV Infinite Storage, the quiet-reservation fix needs Pick Up And Haul, and the trip-planning fix needs both. Load after both.</description>
   <modDependencies>
     <li>
       <packageId>brrainz.harmony</packageId>

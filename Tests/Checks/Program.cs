@@ -30,7 +30,7 @@ Check(infinite != null && infinite.IsSubclassOf(GameType("Building_Storage")), "
 void ParamsMatch(MethodInfo target, MethodInfo patch, string what) {
     var names = target.GetParameters().Select(p => p.Name).ToHashSet();
     foreach (var p in patch.GetParameters())
-        Check(p.Name == "__result" || names.Contains(p.Name), what + ": patch parameter '" + p.Name + "' exists on the target");
+        Check(p.Name == "__result" || p.Name == "__instance" || names.Contains(p.Name), what + ": patch parameter '" + p.Name + "' exists on the target");
     var res = patch.GetParameters().SingleOrDefault(p => p.Name == "__result");
     if (res != null) Check(res.ParameterType.GetElementType() == target.ReturnType, what + ": __result type matches the target's return type " + target.ReturnType.Name);
 }
@@ -72,10 +72,23 @@ var skip = fix.GetType("PUAHInfiniteStorageFix.HaulDiversion", true)!.GetMethod(
 bool Skip(bool inf, bool acc) => (bool)skip.Invoke(null, new object[] { inf, acc })!;
 Check(Skip(true, false) && !Skip(true, true) && !Skip(false, false) && !Skip(false, true), "Only an Infinite Storage that would refuse the item is skipped; working ones and normal storage are still found");
 
+// 1.2: Pick Up And Haul's reservations honour errorOnFailed.
+string jdName = (string)fixType.GetField("JobDriverTypeName")!.GetRawConstantValue()!;
+Type jobDriverT = puah.GetType(jdName)!;
+var reserveStep = jobDriverT?.GetMethod("TryMakePreToilReservations", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)!;
+Type jdBase = game.GetType("Verse.AI.JobDriver", true)!;
+Check(reserveStep != null && reserveStep.GetBaseDefinition().DeclaringType == jdBase && reserveStep.ReturnType == typeof(bool), "Target 4: Pick Up And Haul's JobDriver_HaulToInventory.TryMakePreToilReservations(bool errorOnFailed) override");
+ParamsMatch(reserveStep, fixType.GetMethod("QuietReservationsPrefix")!, "Quiet-reservation prefix");
+Check(fixType.GetMethod("QuietReservationsPrefix")!.GetParameters().Single(p => p.Name == "__instance").ParameterType == jdBase && fixType.GetMethod("QuietReservationsPrefix")!.ReturnType == typeof(bool), "Quiet-reservation prefix replaces the original (returns false) and gets the driver as __instance");
+var resUtil = game.GetType("Verse.AI.ReservationUtility", true)!;
+Check(resUtil.GetMethods().Any(m => m.Name == "Reserve" && m.GetParameters().Any(p => p.Name == "errorOnFailed")) && resUtil.GetMethods().Any(m => m.Name == "ReserveAsManyAsPossible"), "Vanilla Reserve(…, errorOnFailed) and ReserveAsManyAsPossible exist");
+Check(jdBase.GetField("pawn") != null && jdBase.GetField("job") != null && game.GetType("Verse.AI.Job", true)!.GetField("targetQueueA") != null && game.GetType("Verse.AI.Job", true)!.GetField("targetQueueB") != null, "JobDriver.pawn/job and Job.targetQueueA/B exist (what the original reserves)");
+Check(game.GetType("Verse.AI.Pawn_JobTracker", true)!.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance).Any(m => m.Name == "StartJob" && m.GetParameters().Any(p => p.Name == "fromQueue")), "Vanilla StartJob knows whether a job came from the queue (and passes errorOnFailed=false for it)");
+
 // Mod metadata: loads after both mods and Harmony; doesn't ship its own Harmony.
 var about = XDocument.Load(Path.Combine(modRoot, "About/About.xml")).Root!;
 var after = about.Element("loadAfter")!.Elements("li").Select(e => e.Value).ToList();
 Check(after.Contains("Mehni.PickUpAndHaul") && after.Contains("Mlie.KVInfiniteStorage") && after.Contains("brrainz.harmony"), "About.xml loads after Pick Up And Haul, KV Infinite Storage and Harmony");
 Check(about.Element("supportedVersions")!.Elements("li").Any(e => e.Value == "1.6") && about.Descendants("packageId").First().Value == "nopphan.puahinfinitestoragefix", "About.xml: RimWorld 1.6, own packageId");
 Check(!File.Exists(Path.Combine(modRoot, "Assemblies/0Harmony.dll")), "Doesn't ship a second copy of Harmony (uses the Harmony mod)");
-Console.WriteLine($"PUAH x INFINITE STORAGE FIX 1.1: {checks} checks passed.");
+Console.WriteLine($"PUAH x INFINITE STORAGE FIX 1.2: {checks} checks passed.");

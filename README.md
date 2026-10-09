@@ -17,11 +17,19 @@ checks power. An unpowered storage (solar at night, a blackout, a solar flare, o
 the destination, every haul to it failed the moment it started, and colonists retried forever
 ("X started 10 jobs in one tick. newJob=HaulToCell …"). This needs only KV Infinite Storage, not Pick Up And Haul.
 
+## Also: "Could not reserve … HaulToInventory" errors (1.2)
+Vanilla starts a *queued* job with `TryMakePreToilReservations(errorOnFailed: false)`, because a queued plan can go
+stale. For example, a mech lifter may grab an item a colonist's queued trip meant to pick up. Pick Up And Haul's
+`JobDriver_HaulToInventory.TryMakePreToilReservations` ignores the flag and always reserves with errors on, so
+every lost race logs a red error. A prefix makes the same reservations but honours `errorOnFailed`: the trip
+fails quietly and the colonist picks other work. This needs only Pick Up And Haul.
+
 ## The fix
 Harmony patches, applied only for what's loaded (both mods are looked up by type name):
 
 | Patch | Effect |
 |---|---|
+| Prefix on `JobDriver_HaulToInventory.TryMakePreToilReservations` (needs only Pick Up And Haul) | Same reservations, but honours vanilla's `errorOnFailed`, so lost races fail quietly. |
 | Prefix on vanilla `StoreUtility.TryFindBestBetterStoreCellForWorker` (needs only Infinite Storage) | Skips an Infinite Storage that would refuse the item (`Accepts` false, e.g. unpowered), or a linked group made only of such storages. |
 | Prefix on `WorkGiver_HaulToInventory.JobOnThing` | If the item's best storage (vanilla `StoreUtility.TryFindBestBetterStorageFor`) is an Infinite Storage, return vanilla's `HaulAIUtility.HaulToStorageJob`, the one-stack haul Infinite Storage is built for. |
 | Postfix on `WorkGiver_HaulToInventory.TryFindBestBetterStorageFor` | For extra items on a multi-item trip, an Infinite Storage counts as "no storage found", so it's never added as a stop. |
