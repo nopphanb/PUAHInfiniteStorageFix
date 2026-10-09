@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <AssemblyName>PUAHInfiniteStorageFix</AssemblyName>
+    <RootNamespace>PUAHInfiniteStorageFix</RootNamespace>
+    <Version>1.0.0</Version>
+    <LangVersion>7.3</LangVersion>
+    <Deterministic>true</Deterministic>
+    <DebugType>none</DebugType>
+    <OutputPath>../Assemblies/</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <GameManagedDir Condition="'$(GameManagedDir)' == ''">$(HOME)/Library/Application Support/Steam/steamapps/common/RimWorld/RimWorldMac.app/Contents/Resources/Data/Managed</GameManagedDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Harmony comes from the Harmony mod (dependency), so it is not shipped. -->
+    <PackageReference Include="Lib.Harmony" Version="2.4.2" PrivateAssets="all" ExcludeAssets="runtime" />
+    <!-- Compile-only framework references allow building on macOS with .NET SDK. -->
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(GameManagedDir)/Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(GameManagedDir)/UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+  <Target Name="CheckGameReferences" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(GameManagedDir)/Assembly-CSharp.dll')" Text="RimWorld assembly not found. Run bash build.sh with the path to RimWorldMac.app, or set -p:GameManagedDir to its Managed directory." />
+  </Target>
+</Project>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ModMetaData>
+  <name>Pick Up And Haul × Infinite Storage Fix</name>
+  <author>nopphan</author>
+  <packageId>nopphan.puahinfinitestoragefix</packageId>
+  <modVersion>1.0.0</modVersion>
+  <supportedVersions>
+    <li>1.6</li>
+  </supportedVersions>
+  <description>Stops Pick Up And Haul from looping on KV Infinite Storage ("Invalid count: -1 ... HaulToInventory" spam, and the deep job chains that can crash the game).
+
+Pick Up And Haul plans multi-item trips by counting free stack space in the target cell, but Infinite Storage stores items virtually, so that plan comes out broken and the job fails and restarts forever. With this mod, Pick Up And Haul keeps its multi-item hauling for every normal stockpile and shelf, while items whose best storage is an Infinite Storage are hauled by vanilla's one-stack job, which Infinite Storage is built for. Infinite Storage is also never added as an extra stop on a multi-item trip.
+
+Needs both Pick Up And Haul and KV Infinite Storage; does nothing if either is missing. Load after both.</description>
+  <modDependencies>
+    <li>
+      <packageId>brrainz.harmony</packageId>
+      <displayName>Harmony</displayName>
+      <steamWorkshopUrl>steam://url/CommunityFilePage/2009463077</steamWorkshopUrl>
+    </li>
+  </modDependencies>
+  <loadAfter>
+    <li>brrainz.harmony</li>
+    <li>Mehni.PickUpAndHaul</li>
+    <li>Mlie.KVInfiniteStorage</li>
+  </loadAfter>
+</ModMetaData>
