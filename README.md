@@ -32,3 +32,6 @@ KV Infinite Storage assemblies:
 - the vanilla calls the fix makes exist;
 - only Infinite Storage is diverted, while normal storage keeps multi-item trips;
 - the load order is right, and it doesn't ship its own Harmony.
+
+## License
+MIT, see [LICENSE](LICENSE).
