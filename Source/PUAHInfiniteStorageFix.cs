@@ -8,18 +8,23 @@ using Verse.AI;
 
 namespace PUAHInfiniteStorageFix
 {
-    // Pick Up And Haul plans multi-item trips by counting free stack space in the
-    // target cell (CapacityAt -> GetItemStackSpaceLeftFor). KV Infinite Storage
-    // keeps items virtually, so that plan is nonsense and the HaulToInventory job
-    // fails and restarts forever. Items bound for an Infinite Storage are handed
-    // to vanilla's one-stack haul job instead, and Infinite Storage is never added
-    // as an extra stop. Both mods are looked up by name; nothing is patched unless
-    // both are loaded.
-    // The diversion decision, kept free of game startup code so it can be tested.
+    // 1. Vanilla haul search picks an Infinite Storage that would refuse the item
+    //    (e.g. unpowered); every haul to it fails at once and retries forever.
+    //    Such storage is skipped by the search (needs only KV Infinite Storage).
+    // 2. Pick Up And Haul plans multi-item trips by counting free stack space in
+    //    the target cell; Infinite Storage keeps items virtually, so the plan is
+    //    nonsense and HaulToInventory restarts forever. Items bound for an Infinite
+    //    Storage go to vanilla's one-stack haul job, and it is never an extra stop.
+    // Both mods are looked up by name; patches apply only to what is loaded.
+    // The decisions, kept free of game startup code so they can be tested.
     public static class HaulDiversion
     {
         public static bool IsInfiniteStorage(object destination, Type infiniteType) =>
             destination != null && infiniteType != null && infiniteType.IsInstanceOfType(destination);
+
+        // An Infinite Storage that would refuse the item (unpowered, adds disabled,
+        // filter) must not be offered as a haul destination.
+        public static bool ShouldSkip(bool isInfiniteStorage, bool accepts) => isInfiniteStorage && !accepts;
     }
 
     [StaticConstructorOnStartup]
@@ -35,19 +40,47 @@ namespace PUAHInfiniteStorageFix
 
         static PUAHInfiniteStorageFix()
         {
-            Type workGiver = AccessTools.TypeByName(WorkGiverTypeName);
             infiniteStorage = AccessTools.TypeByName(InfiniteStorageTypeName);
-            if (workGiver == null || infiniteStorage == null)
+            if (infiniteStorage == null)
             {
-                Log.Warning(LogPrefix + "needs both Pick Up And Haul and KV Infinite Storage; doing nothing.");
+                Log.Warning(LogPrefix + "KV Infinite Storage isn't loaded; doing nothing.");
                 return;
             }
             var harmony = new Harmony("nopphan.puahinfinitestoragefix");
+            // Vanilla's storage-cell search only checks the storage's item filter,
+            // but haul jobs then check Accepts, where Infinite Storage's power check
+            // lives. An unpowered storage was picked, every haul to it failed at
+            // once, and haulers retried forever ("started 10 jobs in one tick").
+            harmony.Patch(AccessTools.Method(typeof(StoreUtility), "TryFindBestBetterStoreCellForWorker"),
+                prefix: new HarmonyMethod(typeof(PUAHInfiniteStorageFix), nameof(StoreCellSearchPrefix)));
+            Type workGiver = AccessTools.TypeByName(WorkGiverTypeName);
+            if (workGiver == null)
+            {
+                Log.Message(LogPrefix + "haulers now skip Infinite Storage that would refuse an item (Pick Up And Haul not loaded).");
+                return;
+            }
             harmony.Patch(AccessTools.DeclaredMethod(workGiver, "JobOnThing"),
                 prefix: new HarmonyMethod(typeof(PUAHInfiniteStorageFix), nameof(JobOnThingPrefix)));
             harmony.Patch(AccessTools.DeclaredMethod(workGiver, "TryFindBestBetterStorageFor"),
                 postfix: new HarmonyMethod(typeof(PUAHInfiniteStorageFix), nameof(ExtraStopPostfix)));
-            Log.Message(LogPrefix + "Pick Up And Haul now leaves Infinite Storage to vanilla hauling.");
+            Log.Message(LogPrefix + "haulers skip Infinite Storage that would refuse an item, and Pick Up And Haul leaves Infinite Storage to vanilla hauling.");
+        }
+
+        private static bool Refuses(object member, Thing t) =>
+            HaulDiversion.ShouldSkip(HaulDiversion.IsInfiniteStorage(member, infiniteStorage),
+                member is Building_Storage storage && storage.Accepts(t));
+
+        // Skip an Infinite Storage (or a linked group made only of them) that would
+        // refuse the item, matching the Accepts check the haul job makes later.
+        public static bool StoreCellSearchPrefix(Thing t, ISlotGroup slotGroup)
+        {
+            if (t == null || slotGroup == null)
+                return true;
+            if (slotGroup is SlotGroup group)
+                return !Refuses(group.parent, t);
+            if (slotGroup is StorageGroup linked && linked.members.Count > 0)
+                return !linked.members.All(m => Refuses(m, t));
+            return true;
         }
 
         private static bool IsInfiniteAt(Map map, IntVec3 cell, IHaulDestination destination)

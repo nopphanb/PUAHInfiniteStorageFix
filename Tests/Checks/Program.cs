@@ -61,10 +61,21 @@ bool Is(object? o) => (bool)isInf.Invoke(null, new[] { o, infinite })!;
 Check(Is(RuntimeHelpers.GetUninitializedObject(infinite!)), "An Infinite Storage is diverted to vanilla hauling");
 Check(!Is(RuntimeHelpers.GetUninitializedObject(GameType("Building_Storage"))) && !Is(null), "Normal storage buildings (and no destination) keep Pick Up And Haul's multi-item trips");
 
+// 1.1: vanilla storage-cell search skips an Infinite Storage that would refuse the item.
+var worker = store.GetMethod("TryFindBestBetterStoreCellForWorker", BindingFlags.NonPublic | BindingFlags.Static)!;
+Check(worker != null && worker.GetParameters().Any(x => x.Name == "slotGroup" && x.ParameterType == GameType("ISlotGroup")), "Target 3: vanilla StoreUtility.TryFindBestBetterStoreCellForWorker(…, ISlotGroup slotGroup, …) exists");
+ParamsMatch(worker, fixType.GetMethod("StoreCellSearchPrefix")!, "Store-cell search prefix");
+Check(fixType.GetMethod("StoreCellSearchPrefix")!.ReturnType == typeof(bool), "Store-cell search prefix can skip a storage group");
+Check(GameType("Building_Storage").GetMethod("Accepts", new[] { GameType("Thing") }) != null && GameType("SlotGroup").GetField("parent") != null && GameType("StorageGroup").GetField("members") != null, "Vanilla Building_Storage.Accepts, SlotGroup.parent and StorageGroup.members exist");
+Check(kv.GetTypes().Any(t => t.Name == "Building_Storage_Accepts"), "KV Infinite Storage puts its power check in Building_Storage.Accepts (its Building_Storage_Accepts patch), which the fix calls");
+var skip = fix.GetType("PUAHInfiniteStorageFix.HaulDiversion", true)!.GetMethod("ShouldSkip")!;
+bool Skip(bool inf, bool acc) => (bool)skip.Invoke(null, new object[] { inf, acc })!;
+Check(Skip(true, false) && !Skip(true, true) && !Skip(false, false) && !Skip(false, true), "Only an Infinite Storage that would refuse the item is skipped; working ones and normal storage are still found");
+
 // Mod metadata: loads after both mods and Harmony; doesn't ship its own Harmony.
 var about = XDocument.Load(Path.Combine(modRoot, "About/About.xml")).Root!;
 var after = about.Element("loadAfter")!.Elements("li").Select(e => e.Value).ToList();
 Check(after.Contains("Mehni.PickUpAndHaul") && after.Contains("Mlie.KVInfiniteStorage") && after.Contains("brrainz.harmony"), "About.xml loads after Pick Up And Haul, KV Infinite Storage and Harmony");
 Check(about.Element("supportedVersions")!.Elements("li").Any(e => e.Value == "1.6") && about.Descendants("packageId").First().Value == "nopphan.puahinfinitestoragefix", "About.xml: RimWorld 1.6, own packageId");
 Check(!File.Exists(Path.Combine(modRoot, "Assemblies/0Harmony.dll")), "Doesn't ship a second copy of Harmony (uses the Harmony mod)");
-Console.WriteLine($"PUAH x INFINITE STORAGE FIX: {checks} checks passed.");
+Console.WriteLine($"PUAH x INFINITE STORAGE FIX 1.1: {checks} checks passed.");
